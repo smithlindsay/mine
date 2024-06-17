@@ -1,15 +1,9 @@
 from mine.models.mine import Mine
 import torch.nn as nn
 import numpy as np
-import torchvision
 import torch
-import torchvision.transforms as transforms
-from tqdm import tqdm
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
-from math import ceil
-import sys
-from skimage.filters import gabor_kernel
 
 # params
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

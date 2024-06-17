@@ -1,15 +1,15 @@
-import numpy 
+import numpy as np
 import math
 import torch
 import torch.nn as nn
-import mine.utils.helpers as utils
+import helpers as utils
 from tqdm.auto import tqdm
 
 torch.autograd.set_detect_anomaly(True)
 
 EPS = 1e-6
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-datadir = "/scratch/network/ls1546/mine-pytorch/data/"
+datadir = "/scratch/gpfs/ls1546/mine/data/"
 
 class EMALoss(torch.autograd.Function):
     @staticmethod
@@ -57,6 +57,7 @@ class Mine(nn.Module):
         self.loss = loss
         self.alpha = alpha
         self.device = device
+        self.T = T.to(device)
 
     # if the values from T(x, z_marg) are too large to fit in float32 when exponentiated, the loss will be nan. toggle the biased calculation on instead
     def bias_toggle(self, t_marg):
@@ -154,7 +155,7 @@ class Mine(nn.Module):
             # checkpoint the model if loss below threshold & save best model
             best_loss, count = self.checkpoint(curr_loss, best_loss, name, count)
         final_mi = self.mi(X_test, Y_test)
-        print(f"Final MI on test data: {final_mi}")
+        print(f"Final MI on test data: {final_mi.item()}")
 
         # Average the weights of the checkpointed models
         self.avg_checkpoint(name, count)
