@@ -2,7 +2,7 @@ import numpy as np
 import math
 import torch
 import torch.nn as nn
-import helpers as utils
+import mine.helpers as utils
 from tqdm.auto import tqdm
 
 torch.autograd.set_detect_anomaly(True)
@@ -16,17 +16,12 @@ class EMALoss(torch.autograd.Function):
     def forward(ctx, input, running_ema):
         ctx.save_for_backward(input, running_ema)
         input_log_sum_exp = torch.logsumexp(input, 0) - math.log(input.shape[0])
-        # input_log_sum_exp = input.exp().mean().log()
         
         return input_log_sum_exp
 
     @staticmethod
     def backward(ctx, grad_output):
-        # breakpoint()
         input, running_mean = ctx.saved_tensors
-        # grad = grad_output * input.exp().detach() / \
-            # (running_mean + EPS) / input.shape[0]
-
         grad = (grad_output.log() + input.detach() - math.log(input.shape[0]) - (running_mean + EPS).log()).exp()
         return grad, None
 
@@ -36,9 +31,6 @@ def ema(mu, alpha, past_ema):
 
 
 def ema_loss(x, running_mean, alpha):
-    # c = torch.max(x)
-    # t_log_test = c + torch.log(torch.mean(torch.exp(x - c), 0))
-    # t_exp = torch.exp(t_log_test)
     t_exp = torch.exp(torch.logsumexp(x, 0) - math.log(x.shape[0])).detach()
     if running_mean == 0:
         running_mean = t_exp
@@ -59,7 +51,8 @@ class Mine(nn.Module):
         self.device = device
         self.T = T.to(device)
 
-    # if the values from T(x, z_marg) are too large to fit in float32 when exponentiated, the loss will be nan. toggle the biased calculation on instead
+    # if the values from T(x, z_marg) are too large to fit in float32 when exponentiated, 
+    # the loss will be nan. toggle the biased calculation on instead
     def bias_toggle(self, t_marg):
         if (torch.max(t_marg) - math.log(t_marg.shape[0])) > 87:
             self.loss = 'mine_biased'
@@ -144,7 +137,7 @@ class Mine(nn.Module):
                     loss_type.append(0)
                 else:
                     loss_type.append(1)
-                loss_list.append(loss.item())
+                loss_list.append(-loss.item())
                 loss.backward()
                 opt.step()
 
