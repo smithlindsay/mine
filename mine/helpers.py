@@ -19,9 +19,9 @@ class MineDataset(Dataset):
     def __getitem__(self, idx):
         return (self.x[idx], self.y[idx])
 
-def batch(x, y, batch_size=1, shuffle=True):    
+def dataloader(x, y, batch_size=1, shuffle=True):    
     dataset = MineDataset(x, y)
     
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, pin_memory=True)
+    dl = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=8, pin_memory=True)
     
-    return dataloader
+    return dl

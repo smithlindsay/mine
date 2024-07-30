@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import mine.helpers as utils
 from tqdm.auto import tqdm
+# import time
 
 torch.autograd.set_detect_anomaly(True)
 
@@ -60,15 +61,15 @@ class Mine(nn.Module):
             self.loss = 'mine'
 
     def checkpoint(self, curr_loss, best_loss, name, count):
-        threshold = 10.0
+        threshold = 0.005
         if curr_loss < threshold:
-                if curr_loss < best_loss:
-                    best_loss = curr_loss
-                    torch.save(self.T, f"{datadir}{name}_best_mine.pth")
-                    np.save(f"{datadir}{name}_best_loss.npy", best_loss)
-                
-                torch.save(self.T, f"{datadir}{name}_ckpt_mine{count}.pth")
-                count += 1
+            if curr_loss < best_loss:
+                best_loss = curr_loss
+                torch.save(self.T, f"{datadir}{name}_best_mine.pth")
+                np.save(f"{datadir}{name}_best_loss.npy", best_loss)
+            
+            torch.save(self.T, f"{datadir}{name}_ckpt_mine{count}.pth")
+            count += 1
         return best_loss, count
     
     def avg_checkpoint(self, name, count):
@@ -120,15 +121,21 @@ class Mine(nn.Module):
     def optimize(self, X, Y, epochs, batch_size, lam, name, X_test, Y_test, opt=None):
         count = 0
         best_loss = np.inf
-        loss_list = []
+        losses = []
         loss_type = []
 
         if opt is None:
             opt = torch.optim.AdamW(self.parameters(), lr=1e-4, weight_decay=lam)
 
+        dataloader =  utils.dataloader(X, Y, batch_size)
+
         for epoch in (pbar := tqdm(range(1, epochs + 1))):
             mu_mi = 0
-            for x, y in utils.batch(X, Y, batch_size):
+            # end = time.time()
+            for x, y in dataloader:
+                # measure data loading time
+                # data_time = time.time() - end
+
                 x, y = x.to(self.device), y.to(self.device)
                 opt.zero_grad()
                 loss = self.forward(x, y)
@@ -137,14 +144,18 @@ class Mine(nn.Module):
                     loss_type.append(0)
                 else:
                     loss_type.append(1)
-                loss_list.append(-loss.item())
+                losses.append(-loss.item())
                 loss.backward()
                 opt.step()
 
                 mu_mi -= loss.item()
+                # measure elapsed time
+                # batch_time = time.time() - end
+                # end = time.time()
+                # print(f"batch time: {batch_time}, data time: {data_time}")
 
             pbar.set_description(f"epoch: {epoch}, mu_mi: {mu_mi:4f}")
-            curr_loss = loss_list[epoch]
+            curr_loss = losses[epoch]
             # checkpoint the model if loss below threshold & save best model
             best_loss, count = self.checkpoint(curr_loss, best_loss, name, count)
         final_mi = self.mi(X_test, Y_test)
@@ -153,4 +164,4 @@ class Mine(nn.Module):
         # Average the weights of the checkpointed models
         self.avg_checkpoint(name, count)
 
-        return final_mi, loss_list, loss_type
+        return final_mi, losses, loss_type
